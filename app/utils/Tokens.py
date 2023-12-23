@@ -7,6 +7,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 class ManageTokens():
+    @staticmethod
     def create_access_token(data: dict):
         to_encode = data.copy()
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -14,12 +15,12 @@ class ManageTokens():
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
 
-
+    @staticmethod
     def verify_token(token:str, exception):
         try:
             # Decode the token payload
             payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            return payload
+            return payload["sub"]
         except jwt.ExpiredSignatureError:
             # Token has expired
             raise exception

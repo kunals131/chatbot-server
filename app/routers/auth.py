@@ -3,9 +3,9 @@ from pydantic import BaseModel
 from config.mongo_connection import get_db_instance
 from pymongo.database import Database
 from app.utils.Hash import Hash
-from app.services.oauth import get_current_user
+from app.services.OAuth import get_current_user
 from app.utils.Tokens import ManageTokens
-
+from app.utils.Validators import AuthTokenData
 router = APIRouter()
 
 class LoginPayload(BaseModel):
@@ -17,8 +17,7 @@ class RegisterPayload(BaseModel):
     password: str
     confirm_password: str
 
-class TokenData(BaseModel):
-    username: str
+
 
 @router.post("/login")
 def login_user(body:LoginPayload, db:Database = Depends(get_db_instance)):
@@ -27,9 +26,13 @@ def login_user(body:LoginPayload, db:Database = Depends(get_db_instance)):
     password = body.password
     user = users_collection.find_one({"username":username})
     print(user)
+    token_data:AuthTokenData = {
+        "username": username,
+        "id": str(user["_id"])
+    }
     if user:
         if Hash.verify(user["password"],password):
-                access_token = ManageTokens.create_access_token(data={"sub": {'username': username}})
+                access_token = ManageTokens.create_access_token(data={"sub": token_data})
                 return {"token": access_token}
         else:
             raise HTTPException(status_code=401, detail="Login credentails are invalid.")
@@ -55,6 +58,5 @@ def register_user(body:RegisterPayload, db:Database = Depends(get_db_instance)):
             return {"success": True, "message": "User has been registered successfully!"}
 
 @router.get("/verify-auth")
-def verify_auth(token_data: TokenData = Depends(get_current_user)):
-    print(token_data)
-    return {"success": True, "message": "User is authenticated!"}
+def verify_auth(token_data: AuthTokenData = Depends(get_current_user)):
+    return {"success": True, "message": "User is authenticated!", "data": token_data}
