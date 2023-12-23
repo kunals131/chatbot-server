@@ -6,15 +6,15 @@ from pymongo.database import Database
 from app.services.DialogFlow import ChatBot
 from typing import Optional
 from pydantic import BaseModel
+from app.services.EngineersQuery import EngineersQuery
 from app.utils.Helpers import Helpers
 from bson import ObjectId  
 import uuid
 
 
-
 router = APIRouter()
 bot = ChatBot()
-
+engineersDb = EngineersQuery()
 
 class CreateThreadPayload(BaseModel):
     message:str
@@ -47,6 +47,10 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
  
     messages_collection = db["messages"]
     botResponse = bot.interact(session_id=session_id, text=payload.message)
+    botResponse['engineers'] = []
+    if Helpers.is_valid_dict(botResponse['entities']):
+        botResponse['engineers'] = engineersDb.get_engineers(payload.message,botResponse['entities'])
+
     message = {
         "userId": auth['id'],
         "message": payload.message,
@@ -54,7 +58,7 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
         "intent": botResponse['intent'],
         "entities": botResponse['entities'],
         "sessionId": session_id,
-        "suggestedResults": [],
+        "suggestedResults": Helpers.parse_json(botResponse['engineers']),
         "threadId": str(currentThread["_id"])
     }
     message = messages_collection.insert_one(message)
@@ -79,7 +83,7 @@ def get_thread(thread_id:str,auth: AuthTokenData = Depends(get_current_user), db
 def delete_thread(thread_id:str,auth: AuthTokenData = Depends(get_current_user), db:Database = Depends(get_db_instance)):
     threads_collection = db["threads"]
     thread = threads_collection.find_one({"_id": thread_id})
-    if thread["userId"] != auth.id:
+    if thread["userId"] != auth['id']:
         raise HTTPException(status_code=401, detail="You are not authorized to delete this thread.")
     threads_collection.delete_one({"_id": thread_id})
     return {"success": True, "message": "Thread has been deleted successfully!"}

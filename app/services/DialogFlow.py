@@ -26,10 +26,10 @@ class ChatBot():
         query_input = dialogflow.QueryInput(text=text_input)
         response = self.client.detect_intent(request={"session": session, "query_input": query_input})
         entities = dict(response.query_result.parameters)
+        print(entities, response)
         params = dict()
-        params['session_id'] = session_id
         params['availability'] = entities['availability'] if 'availability' in entities else None
-        params['skills'] = entities['skills'] if 'skills' in entities else [],
+        params['skills'] = list(entities['skill'])[0] if len(list(entities['skill']) if 'skill' in entities else [])>0 else []
         params['budget'] = dict(entities['unit-currency']) if 'unit-currency' in entities else {}
         return {
             'response': response.query_result.fulfillment_text,
