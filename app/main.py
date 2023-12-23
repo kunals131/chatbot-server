@@ -3,7 +3,6 @@ from starlette.responses import RedirectResponse  # Correct import
 from .routers import auth, threads  # Import the items router
 from fastapi.middleware.cors import CORSMiddleware
 from config.AppConfig import config
-import pinecone
 
 app = FastAPI(title=config.app_name)
 app.add_middleware(
