@@ -21,6 +21,9 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/v1/api/auth")
 app.include_router(threads.router, prefix="/v1/api/thread")
 
+@app.get("/")
+async def get_root():
+    return {"Health": "OK"}
 
 #enables automated documentation
 @app.get("/redoc")
