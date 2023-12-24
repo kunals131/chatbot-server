@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from starlette.responses import RedirectResponse  # Correct import
 from .routers import auth, threads  # Import the items router
 from fastapi.middleware.cors import CORSMiddleware
-from config.AppConfig import config
+from app.config.AppConfig import config
 
 app = FastAPI(title=config.app_name)
 app.add_middleware(

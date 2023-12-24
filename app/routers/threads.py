@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.services.oauth import get_current_user
 from app.utils.Validators import AuthTokenData
-from config.mongo_connection import get_db_instance
+from app.config.mongo_connection import get_db_instance
 from pymongo.database import Database
 from app.services.DialogFlow import ChatBot
 from typing import Optional

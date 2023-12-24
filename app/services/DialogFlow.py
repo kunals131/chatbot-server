@@ -15,7 +15,7 @@ class ChatBotResponse(BaseModel):
 
 class ChatBot():
     def __init__(self):
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'config/credentials.json'
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'app/config/credentials.json'
         self.project_id = 'hip-heading-408717'
         self.language_code = 'en'
         self.client = dialogflow.SessionsClient()

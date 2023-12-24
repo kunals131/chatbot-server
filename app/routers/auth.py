@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from config.mongo_connection import get_db_instance
+from app.config.mongo_connection import get_db_instance
 from pymongo.database import Database
 from app.utils.Hash import Hash
 from app.services.oauth import get_current_user
