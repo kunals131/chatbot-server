@@ -14,16 +14,11 @@ pinecone.init(api_key="11b20ba4-2b37-42a2-8255-b90e095279d1", environment="gcp-s
 
 class EngineersQuery():
     def __init__(self): 
-        self.pineconeIndex = pinecone.Index("engineers")
-        # self.SQLconnection = get_connection()
-        if os.path.exists(model_path):
-            self.model = SentenceTransformer(model_path)
-        else:
-            model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-            self.model = model
+        pass
 
     def get_vector_embeddings(self,text:str, entities):
-        return self.model.encode(text).tolist()
+        model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        return model.encode(text).tolist()
     
     def extractImpWords(self,query:str):
         return ''
@@ -51,7 +46,8 @@ class EngineersQuery():
         
         txtFilter = self.extractImpWords(query=query)+','+','.join(skills)
         vector = self.get_vector_embeddings(txtFilter, entities)
-        queryMatches = self.pineconeIndex.query(vector=vector, top_k=10, filter=metaDataFilter, include_metadata=True)
+        pineconeIndex = pinecone.Index("engineers")
+        queryMatches = pineconeIndex.query(vector=vector, top_k=10, filter=metaDataFilter, include_metadata=True)
         matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
         resumeIds = [match['id'] for match in matches]
         return queryMatches.to_dict()
