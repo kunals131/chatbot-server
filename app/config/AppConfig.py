@@ -1,5 +1,3 @@
-from pydantic import BaseSettings
-
 class AppConfig:
     app_name: str = "Mercor Chat Server V1"
     debug: bool = False
