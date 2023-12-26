@@ -1,6 +1,5 @@
 from sentence_transformers import SentenceTransformer
 # from config.sql_connection import get_connection
-import os
 import pinecone
 model_path = 'models/all-mpnet-base-v2'  
 
@@ -20,8 +19,7 @@ class EngineersQuery():
         model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         return model.encode(text).tolist()
     
-    def extractImpWords(self,query:str):
-        return ''
+
     
     def get_metadata_filters_from_entities(self,entities, queryMode=QueryModes.PERCISE):
         metaDataFilter = {}
@@ -56,10 +54,8 @@ class EngineersQuery():
         return metaDataFilter
     
     def get_engineers_precise(self,query:str, entities):
-        skills = entities['skills'] if entities['skills'] else []
         metaDataFilter = self.get_metadata_filters_from_entities(entities)
-        txtFilter = self.extractImpWords(query=query)+','+','.join(skills)
-        vector = self.get_vector_embeddings(txtFilter)
+        vector = self.get_vector_embeddings(query)
         pineconeIndex = pinecone.Index("engineers")
         queryMatches = pineconeIndex.query(vector=vector,top_k=10, filter=metaDataFilter, include_metadata=True)
         matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
@@ -67,10 +63,8 @@ class EngineersQuery():
         return queryMatches.to_dict()
 
     def get_engineers_balanced(self,query:str, entities):
-        skills = entities['skills'] if entities['skills'] else []
         metaDataFilter = self.get_metadata_filters_from_entities(entities, queryMode=QueryModes.BALANCED)
-        txtFilter = self.extractImpWords(query=query)+','+','.join(skills)
-        vector = self.get_vector_embeddings(txtFilter)
+        vector = self.get_vector_embeddings(query)
         pineconeIndex = pinecone.Index("engineers")
         queryMatches = pineconeIndex.query(vector=vector,top_k=10, filter=metaDataFilter, include_metadata=True)
         matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
