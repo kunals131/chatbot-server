@@ -1,6 +1,7 @@
 import json
 from bson import json_util
 from datetime import datetime
+import random
 class Helpers():
     @staticmethod
     def parse_json(data):
@@ -27,3 +28,22 @@ class Helpers():
         date = now.strftime("%d %b %Y")  # Format date as "20 Dec 2019"
 
         return f"{hour}:{minute}{am_pm} {date}"
+    
+    def getRandomAdditionalMsgForSuggestion(isEmpty=True):
+        additionalEmptyMsg = [
+            "No engineers found so far! ",
+            "No engineers found! ",
+            "No engineers found yet! ",
+            "Nada nothing yet! "
+        ]
+        additionalMsg = [
+            "Here are some engineers you might be interested in: ",
+            "Here are some engineers you might like: ",
+            "Here are some engineers you might want to check out: ",
+            "Here are some engineers you might want to look at: ",
+            "I found a few! ",
+        ]
+        if isEmpty:
+            return additionalEmptyMsg[random.randint(0,len(additionalEmptyMsg)-1)]
+        else:
+            return additionalMsg[random.randint(0,len(additionalMsg)-1)]
