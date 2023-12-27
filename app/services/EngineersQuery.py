@@ -56,29 +56,40 @@ class EngineersQuery():
         return metaDataFilter
     
     def get_engineer_details(self,results):
-        self.sqlConn = get_connection()
-        matches = results['matches']
-        resumeIds = [match['id'] for match in matches]
-        resume_ids_str = ','.join("'" + str(id) + "'" for id in resumeIds)
-        print(resume_ids_str)
-        query = """
-            SELECT r.resumeId, r.userId, pi.name, pi.email, pi.phone, u.fullTimeStatus, u.workAvailability, u.fullTimeSalaryCurrency, 
-            u.fullTimeSalary, u.partTimeSalaryCurrency, u.partTimeSalary, u.fullTimeAvailability, 
-            u.partTimeAvailability, u.preferredRole,
-            GROUP_CONCAT(DISTINCT we.company) AS WorkExperience,
-            GROUP_CONCAT(DISTINCT ed.degree) AS Education,
-            pi.location
-            FROM UserResume r
-            LEFT JOIN PersonalInformation pi ON r.resumeId = pi.resumeId
-            LEFT JOIN MercorUsers u ON r.userId = u.userId
-            LEFT JOIN WorkExperience we ON r.resumeId = we.resumeId
-            LEFT JOIN Education ed ON r.resumeId = ed.resumeId
-            WHERE r.resumeId IN ({})
-            GROUP BY r.resumeId, pi.location, pi.name, pi.email, pi.phone
-        """.format(resume_ids_str)
-
-        df = pd.read_sql(query, self.sqlConn)
-        return df.to_dict(orient='records')
+        try:
+            self.sqlConn = get_connection()
+            matches = results['matches']
+            resumeIds = [match['id'] for match in matches]
+            resume_ids_str = ','.join("'" + str(id) + "'" for id in resumeIds)
+            print(resume_ids_str)
+            query = """
+                SELECT r.resumeId, r.userId, pi.name, pi.email, pi.phone, u.fullTimeStatus, u.workAvailability, u.fullTimeSalaryCurrency, 
+                u.fullTimeSalary, u.partTimeSalaryCurrency, u.partTimeSalary, u.fullTimeAvailability, 
+                u.partTimeAvailability, u.preferredRole,
+                GROUP_CONCAT(DISTINCT we.company) AS WorkExperience,
+                GROUP_CONCAT(DISTINCT ed.degree) AS Education,
+                pi.location
+                FROM UserResume r
+                LEFT JOIN PersonalInformation pi ON r.resumeId = pi.resumeId
+                LEFT JOIN MercorUsers u ON r.userId = u.userId
+                LEFT JOIN WorkExperience we ON r.resumeId = we.resumeId
+                LEFT JOIN Education ed ON r.resumeId = ed.resumeId
+                WHERE r.resumeId IN ({})
+                GROUP BY r.resumeId, pi.location, pi.name, pi.email, pi.phone
+            """.format(resume_ids_str)
+            cursor = self.sqlConn.cursor()
+            cursor.execute(query)
+            records = cursor.fetchall()
+            cursor.close()
+            results = []
+            for row in records:
+                column_names = [description[0] for description in cursor.description]
+                row_dict = dict(zip(column_names, row))
+                results.append(row_dict)
+            return results
+        except Exception as e:
+            print(e)
+            return []
 
     def processEngineerResults(self,matches):
         updated_data = []
