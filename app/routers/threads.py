@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from fastapi import APIRouter, Depends, HTTPException
 from app.services.oauth import get_current_user
 from app.utils.Validators import AuthTokenData
 from app.config.mongo_connection import get_db_instance
@@ -80,6 +80,9 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
         {"$push": {"messages": message.inserted_id}, "$set": {"updatedAt": datetime.utcnow().isoformat(), "lastMessage": payload.message}}
     )
     createdMessage = messages_collection.find_one({"_id": message.inserted_id})
+    
+    if createdMessage["suggestedResults"]:
+        createdMessage["populatedResults"] = engineersDb.get_engineer_details(createdMessage["suggestedResults"])
 
     if isNewThread:
         currentThread = threads_collection.find_one({"_id": currentThread["_id"]})
@@ -96,7 +99,17 @@ def get_thread(thread_id:str,auth: AuthTokenData = Depends(get_current_user), db
     print(thread_id)
     thread = threads_collection.find_one({"_id": ObjectId(thread_id), "userId": auth['id']}, {'messages': 0})
     messages = message_collection.find({"threadId": thread_id, "userId": auth['id']})
+    messages = list(messages)
+    if len(messages)>0 and messages[len(messages)-1]["suggestedResults"]:
+        messages[len(messages)-1]["populatedResults"] = engineersDb.get_engineer_details(messages[len(messages)-1]["suggestedResults"])
     return {"messages": Helpers.parse_json(messages), "thread": Helpers.parse_json(thread)}
+
+@router.get("/message/{message_id}")
+def get_message_details(message_id:str,auth: AuthTokenData = Depends(get_current_user), db:Database = Depends(get_db_instance)):
+    message_collection = db["messages"]
+    message = message_collection.find_one({"_id": ObjectId(message_id), "userId": auth['id']})
+    message["populatedResults"] = engineersDb.get_engineer_details(message["suggestedResults"])
+    return {"message": Helpers.parse_json(message)}
 
 
 @router.delete("/all")

@@ -1,6 +1,7 @@
 from sentence_transformers import SentenceTransformer
-# from config.sql_connection import get_connection
+from app.config.sql_connection import get_connection
 import pinecone
+import pandas as pd
 model_path = 'models/all-mpnet-base-v2'  
 
 class QueryModes:
@@ -13,11 +14,12 @@ pinecone.init(api_key="11b20ba4-2b37-42a2-8255-b90e095279d1", environment="gcp-s
 
 class EngineersQuery():
     def __init__(self): 
-        pass
+        self.sqlConn = None
 
     def get_vector_embeddings(self,text:str):
         model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         return model.encode(text).tolist()
+
     
 
     
@@ -53,32 +55,67 @@ class EngineersQuery():
         
         return metaDataFilter
     
+    def get_engineer_details(self,results):
+        self.sqlConn = get_connection()
+        matches = results['matches']
+        resumeIds = [match['id'] for match in matches]
+        resume_ids_str = ','.join("'" + str(id) + "'" for id in resumeIds)
+        print(resume_ids_str)
+        query = """
+            SELECT r.resumeId, r.userId, pi.name, pi.email, pi.phone, u.fullTimeStatus, u.workAvailability, u.fullTimeSalaryCurrency, 
+            u.fullTimeSalary, u.partTimeSalaryCurrency, u.partTimeSalary, u.fullTimeAvailability, 
+            u.partTimeAvailability, u.preferredRole,
+            GROUP_CONCAT(DISTINCT we.company) AS WorkExperience,
+            GROUP_CONCAT(DISTINCT ed.degree) AS Education,
+            pi.location
+            FROM UserResume r
+            LEFT JOIN PersonalInformation pi ON r.resumeId = pi.resumeId
+            LEFT JOIN MercorUsers u ON r.userId = u.userId
+            LEFT JOIN WorkExperience we ON r.resumeId = we.resumeId
+            LEFT JOIN Education ed ON r.resumeId = ed.resumeId
+            WHERE r.resumeId IN ({})
+            GROUP BY r.resumeId, pi.location, pi.name, pi.email, pi.phone
+        """.format(resume_ids_str)
+
+        df = pd.read_sql(query, self.sqlConn)
+        return df.to_dict(orient='records')
+
+    def processEngineerResults(self,matches):
+        updated_data = []
+        for obj in matches:
+            updated_obj = {
+                "id": obj["id"],
+                "score": obj["score"],
+                "skills": ', '.join(obj["metadata"]["Skills"]) if obj["metadata"].get("Skills") else "",
+            }
+            updated_data.append(updated_obj)
+        response ={}
+        response['matches'] = updated_data
+        return response
+
+
+    
     def get_engineers_precise(self,query:str, entities):
         metaDataFilter = self.get_metadata_filters_from_entities(entities)
         vector = self.get_vector_embeddings(query)
         pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=10, filter=metaDataFilter, include_metadata=True)
-        matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
-        resumeIds = [match['id'] for match in matches]
+        queryMatches = pineconeIndex.query(vector=vector,top_k=5, filter=metaDataFilter, include_metadata=True)
+        self.get_engineer_details(queryMatches.to_dict())
         return queryMatches.to_dict()
-
     def get_engineers_balanced(self,query:str, entities):
         metaDataFilter = self.get_metadata_filters_from_entities(entities, queryMode=QueryModes.BALANCED)
         vector = self.get_vector_embeddings(query)
         pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=10, filter=metaDataFilter, include_metadata=True)
+        queryMatches = pineconeIndex.query(vector=vector,top_k=5, filter=metaDataFilter, include_metadata=True)
         matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
         resumeIds = [match['id'] for match in matches]
         return queryMatches.to_dict()
-
     def get_engineers_basic(self,query:str):
         vector = self.get_vector_embeddings(query)
         pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=10, include_metadata=True)
-        matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
-        resumeIds = [match['id'] for match in matches]
+        queryMatches = pineconeIndex.query(vector=vector,top_k=5, include_metadata=True)
         return queryMatches.to_dict()
-
+    
     def get_engineers(self,query:str,entities:dict={}, mode:str=QueryModes.PERCISE):
         if mode == QueryModes.PERCISE:
             return self.get_engineers_precise(query, entities)
@@ -94,10 +131,8 @@ class EngineersQuery():
             
 
     def __del__(self):
-        pass
-        # Close the connection when the object is destroyed
-        # if 'SQLConnection' in self and self.SQLconnection:
-        #     self.SQLconnection.close()
+        if self.sqlConn:
+            self.sqlConn.close()
     
     
     
