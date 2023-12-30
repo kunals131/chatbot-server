@@ -11,6 +11,7 @@ from app.utils.Helpers import Helpers
 from bson import ObjectId  
 import uuid
 from datetime import datetime
+from app.utils.Constants import Constants
 
 router = APIRouter()
 bot = ChatBot()
@@ -59,7 +60,8 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
         botResponse = bot.interact(session_id=session_id, text=payload.message)
         botResponse['engineers'] = []
 
-        if Helpers.is_valid_dict(botResponse['entities']):
+        if Helpers.is_valid_dict(botResponse['entities']) or (botResponse['intent'] == Constants.HIRE_ENGINEER_INTENT and payload.queryMode == QueryModes.BASIC):
+            
             botResponse['engineers'] = engineersDb.get_engineers(payload.message,botResponse['entities'], mode=payload.queryMode if payload.queryMode else QueryModes.PERCISE)
 
 

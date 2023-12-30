@@ -2,6 +2,7 @@ from sentence_transformers import SentenceTransformer
 from app.config.sql_connection import get_connection
 import pinecone
 import pandas as pd
+from app.utils.Constants import PINECONE_CREDENTIALS
 model_path = 'models/all-mpnet-base-v2'  
 
 class QueryModes:
@@ -9,7 +10,7 @@ class QueryModes:
     BALANCED = '1'
     BASIC = '2'
 
-pinecone.init(api_key="11b20ba4-2b37-42a2-8255-b90e095279d1", environment="gcp-starter")
+pinecone.init(api_key=PINECONE_CREDENTIALS.API_KEY, environment=PINECONE_CREDENTIALS.ENV)
 
 
 class EngineersQuery():
@@ -17,9 +18,8 @@ class EngineersQuery():
         self.sqlConn = None
 
     def get_vector_embeddings(self,text:str):
-        model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        model = SentenceTransformer('sentence-transformers/multi-qa-MiniLM-L6-cos-v1')
         return model.encode(text).tolist()
-
     
 
     
@@ -109,22 +109,22 @@ class EngineersQuery():
     def get_engineers_precise(self,query:str, entities):
         metaDataFilter = self.get_metadata_filters_from_entities(entities)
         vector = self.get_vector_embeddings(query)
-        pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=5, filter=metaDataFilter, include_metadata=True)
+        pineconeIndex = pinecone.Index(PINECONE_CREDENTIALS.INDEX)
+        queryMatches = pineconeIndex.query(vector=vector,top_k=6, filter=metaDataFilter, include_metadata=True)
         self.get_engineer_details(queryMatches.to_dict())
         return queryMatches.to_dict()
     def get_engineers_balanced(self,query:str, entities):
         metaDataFilter = self.get_metadata_filters_from_entities(entities, queryMode=QueryModes.BALANCED)
         vector = self.get_vector_embeddings(query)
-        pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=5, filter=metaDataFilter, include_metadata=True)
+        pineconeIndex = pinecone.Index(PINECONE_CREDENTIALS.INDEX)
+        queryMatches = pineconeIndex.query(vector=vector,top_k=6, filter=metaDataFilter, include_metadata=True)
         matches = [{key: obj[key] for key in ['id','score']} for obj in queryMatches['matches']]
         resumeIds = [match['id'] for match in matches]
         return queryMatches.to_dict()
     def get_engineers_basic(self,query:str):
         vector = self.get_vector_embeddings(query)
-        pineconeIndex = pinecone.Index("engineers")
-        queryMatches = pineconeIndex.query(vector=vector,top_k=5, include_metadata=True)
+        pineconeIndex = pinecone.Index(PINECONE_CREDENTIALS.INDEX)
+        queryMatches = pineconeIndex.query(vector=vector,top_k=6, include_metadata=True)
         return queryMatches.to_dict()
     
     def get_engineers(self,query:str,entities:dict={}, mode:str=QueryModes.PERCISE):
