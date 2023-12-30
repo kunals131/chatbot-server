@@ -12,10 +12,12 @@ from bson import ObjectId
 import uuid
 from datetime import datetime
 from app.utils.Constants import Constants
+from app.services.QueryAmplifier import QueryAmplifier
 
 router = APIRouter()
 bot = ChatBot()
 engineersDb = EngineersQuery()
+queryAmplifier = QueryAmplifier()
 
 class CreateThreadPayload(BaseModel):
     message:str
@@ -52,17 +54,31 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
         else:
             session_id = str(uuid.uuid4())
             isNewThread = True
-            createdThread = threads_collection.insert_one({"userId": auth['id'], "sessionId": session_id, "messages": [], "title": "New Thread 1","updatedAt": datetime.utcnow().isoformat(), "createdAt": datetime.utcnow().isoformat()})
-            currentThread['_id'] = createdThread.inserted_id
+            createdThread = threads_collection.insert_one({"userId": auth['id'], "sessionId": session_id, "messages": [], "title": "New Thread 1","updatedAt": datetime.utcnow().isoformat(), "createdAt": datetime.utcnow().isoformat(), "keywords": [], "lastMessage": payload.message})
+            currentThread = threads_collection.find_one({"_id": createdThread.inserted_id})
+
 
     
         messages_collection = db["messages"]
         botResponse = bot.interact(session_id=session_id, text=payload.message)
         botResponse['engineers'] = []
+        amp_query=""
+        
+        if botResponse['intent'] == Constants.HIRE_ENGINEER_INTENT:
+            keywords = queryAmplifier.get_keywords(payload.message)
+            currentThread["keywords"] = currentThread["keywords"]+keywords
+            threads_collection.update_one({"_id": currentThread["_id"]}, {"$set": {"updatedAt": datetime.utcnow().isoformat(), "lastMessage": payload.message, "keywords": currentThread["keywords"]}})
+            amp_query=queryAmplifier.amplify_query(payload.message,currentThread["keywords"])
+            currentThread["lastMessage"] = payload.message
+            currentThread["updatedAt"] = datetime.utcnow().isoformat()
+        
+        if not amp_query:
+            amp_query = payload.message
 
-        if Helpers.is_valid_dict(botResponse['entities']) or (botResponse['intent'] == Constants.HIRE_ENGINEER_INTENT and payload.queryMode == QueryModes.BASIC):
-            
-            botResponse['engineers'] = engineersDb.get_engineers(payload.message,botResponse['entities'], mode=payload.queryMode if payload.queryMode else QueryModes.PERCISE)
+        print(amp_query)
+
+        if Helpers.is_valid_dict(botResponse['entities']) or (botResponse['intent'] == Constants.HIRE_ENGINEER_INTENT and (payload.queryMode == QueryModes.BASIC or payload.queryMode == QueryModes.BALANCED)):
+            botResponse['engineers'] = engineersDb.get_engineers(amp_query,botResponse['entities'], mode=payload.queryMode if payload.queryMode else QueryModes.PERCISE)
 
 
         message = {
@@ -86,11 +102,11 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
         if createdMessage["suggestedResults"]:
             createdMessage["populatedResults"] = engineersDb.get_engineer_details(createdMessage["suggestedResults"])
 
-        if isNewThread:
-            currentThread = threads_collection.find_one({"_id": currentThread["_id"]})
-        else:
-            currentThread["lastMessage"] = payload.message
-            currentThread["updatedAt"] = datetime.utcnow().isoformat()
+        # if isNewThread:
+        #     currentThread = threads_collection.find_one({"_id": currentThread["_id"]})
+        # else:
+        #     currentThread["lastMessage"] = payload.message
+        #     currentThread["updatedAt"] = datetime.utcnow().isoformat()
 
         return {"success": True, "message": "Thread has been created successfully!","message": Helpers.parse_json(createdMessage), "isNewThread": isNewThread, "thread": Helpers.parse_json(currentThread)}
     except Exception as e:

@@ -3,6 +3,8 @@ from google.cloud import dialogflow_v2 as dialogflow
 from pydantic import BaseModel
 import re
 from app.utils.Constants import Constants, DIALOGFLOW_CONFIG
+from app.utils.Helpers import Helpers
+
 class ChatBotEntities(BaseModel):
     session_id: str
     availability: str
@@ -48,18 +50,22 @@ class ChatBot():
         response = self.client.detect_intent(request={"session": session, "query_input": query_input})
         return response
     
-    def parseBudgetIfAvailable(self,entities,session_id, text):
-        is_yearly = entities['salaryduration'] == Constants.SALARY_DURATION_YEARLY if 'salary-duration' in entities else False
+    def parseUnitAmountObject(self,entities):
         current_budget = dict(entities['unit-currency']) if 'unit-currency' in entities else None
         current_budget =  current_budget['amount'] if current_budget and 'amount' in current_budget else None
+        return current_budget
+    
+    def parseBudgetIfAvailable(self,entities,session_id, text):
+        is_yearly = entities['salaryduration'] == Constants.SALARY_DURATION_YEARLY if 'salary-duration' in entities else False
+        current_budget = self.parseUnitAmountObject(entities)
         is_unlimited_budget = entities['budget'] == Constants.UNLIMITED_BUDGET_TEXT if 'budget' in entities else False
-        if is_unlimited_budget:
+        if is_unlimited_budget and not current_budget:
             current_budget = Constants.UNLIMITED_BUDGET_VALUE
             if current_budget and is_yearly:
                 current_budget = current_budget/12
             budget_input_response = self.getBotResponse(session_id, f"My budget is ${current_budget}")
-            entities = dict(budget_input_response.query_result.parameters)
-            return entities
+            return budget_input_response
+        
         elif not current_budget:
             extracted_amount = self.parseForAmount(text)
             if extracted_amount and is_yearly:
@@ -67,16 +73,22 @@ class ChatBot():
             if extracted_amount:
                 budget_input_response = self.getBotResponse(session_id, f"My budget is ${extracted_amount}")
                 entities = dict(budget_input_response.query_result.parameters)
-                return entities
+                return budget_input_response
 
     def interact(self,session_id, text)->ChatBotResponse:
         response = self.getBotResponse(session_id, text)
         entities = dict(response.query_result.parameters)
-        parsedBudgetEntities = self.parseBudgetIfAvailable(entities,session_id,text)
-        if parsedBudgetEntities:
-            entities = parsedBudgetEntities
+        if response.query_result.intent.display_name == Constants.HIRE_ENGINEER_INTENT:
+            parsed_entity_response = self.parseBudgetIfAvailable(entities,session_id,text)
+            if parsed_entity_response:
+                parsedBudgetEntities = dict(parsed_entity_response.query_result.parameters)
+                prev_query_amount = self.parseUnitAmountObject(entities)
+                current_query_amount = self.parseUnitAmountObject(parsedBudgetEntities)
+                if prev_query_amount != current_query_amount:
+                    entities = parsedBudgetEntities
+                    response = parsed_entity_response
+
         params = dict()
-     
         params['availability'] = entities['availability'] if 'availability' in entities else None
         params['skills'] = list(entities['skill']) if len(list(entities['skill']) if 'skill' in entities else [])>0 else []
         params['budget'] = dict(entities['unit-currency']) if 'unit-currency' in entities else {}
