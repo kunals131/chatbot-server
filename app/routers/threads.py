@@ -54,16 +54,13 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
             createdThread = threads_collection.insert_one({"userId": auth['id'], "sessionId": session_id, "messages": [], "title": "New Thread 1","updatedAt": datetime.utcnow().isoformat(), "createdAt": datetime.utcnow().isoformat()})
             currentThread['_id'] = createdThread.inserted_id
 
-        print('Mark - 0')
- 
+    
         messages_collection = db["messages"]
         botResponse = bot.interact(session_id=session_id, text=payload.message)
         botResponse['engineers'] = []
-        print('Mark - 1')
 
-        if Helpers.is_valid_dict(botResponse['entities']) or botResponse['intent'] == 'Hire Engineer':
+        if Helpers.is_valid_dict(botResponse['entities']):
             botResponse['engineers'] = engineersDb.get_engineers(payload.message,botResponse['entities'], mode=payload.queryMode if payload.queryMode else QueryModes.PERCISE)
-        print('Mark - 2')
 
 
         message = {
@@ -77,34 +74,21 @@ def send_message(payload:CreateThreadPayload, auth: AuthTokenData = Depends(get_
             "threadId": str(currentThread["_id"]),
             "createdAt": datetime.utcnow().isoformat()
         }
-        print('Mark - 3')
-        print(message)
-
-        message = messages_collection.insert_one(Helpers.parse_json(message))
-
-        print('Mark - 4')
-
+        message = messages_collection.insert_one(message)
         threads_collection.update_one(
             {"_id": currentThread["_id"]},
             {"$push": {"messages": message.inserted_id}, "$set": {"updatedAt": datetime.utcnow().isoformat(), "lastMessage": payload.message}}
         )
-        print('Mark - 5')
-
         createdMessage = messages_collection.find_one({"_id": message.inserted_id})
-        print(createdMessage)
-        print('Mark - 6')
         
         if createdMessage["suggestedResults"]:
             createdMessage["populatedResults"] = engineersDb.get_engineer_details(createdMessage["suggestedResults"])
-        print('Mark - 7')
 
         if isNewThread:
             currentThread = threads_collection.find_one({"_id": currentThread["_id"]})
         else:
             currentThread["lastMessage"] = payload.message
             currentThread["updatedAt"] = datetime.utcnow().isoformat()
-        print('Mark - 8')
-
 
         return {"success": True, "message": "Thread has been created successfully!","message": Helpers.parse_json(createdMessage), "isNewThread": isNewThread, "thread": Helpers.parse_json(currentThread)}
     except Exception as e:
