@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-RUN pip install uvicorn pinecone-client pandas
+RUN pip install uvicorn pinecone-client pandas pymysql
 
 COPY . .
 

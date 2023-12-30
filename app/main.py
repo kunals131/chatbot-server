@@ -7,8 +7,8 @@ from app.config.AppConfig import config
 app = FastAPI(title=config.app_name)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
