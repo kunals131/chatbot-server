@@ -3,6 +3,10 @@ from app.config.sql_connection import get_connection
 import pinecone
 import pandas as pd
 from app.utils.Constants import PINECONE_CREDENTIALS
+from .CustomEntityExtration import CustomEntity
+from flair.nn import Classifier
+from flair.data import Sentence
+
 model_path = 'models/all-mpnet-base-v2'  
 
 class QueryModes:
@@ -127,7 +131,22 @@ class EngineersQuery():
         queryMatches = pineconeIndex.query(vector=vector,top_k=6, include_metadata=True)
         return queryMatches.to_dict()
     
+    def amplify_query(self,query,amp_constant=3):
+        tagger = Classifier.load('ner')
+        sentence = Sentence(query.upper())
+        tagger.predict(sentence)
+        for entity in sentence.get_spans('ner'):
+            query = query+(" "+entity.text+" ")*amp_constant
+        customEntity = CustomEntity()
+        entities = customEntity.extract(query)
+        for entity in entities:
+            query = query+(" "+entity+" ")*amp_constant
+        return query
+        
+    
     def get_engineers(self,query:str,entities:dict={}, mode:str=QueryModes.PERCISE):
+        query = self.amplify_query(query)
+        print(query)
         if mode == QueryModes.PERCISE:
             return self.get_engineers_precise(query, entities)
         elif mode == QueryModes.BALANCED:
